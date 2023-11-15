@@ -1,4 +1,7 @@
-use crate::exercise::{Exercise, Mode, State};
+use crate::{
+    clear_screen,
+    exercise::{Exercise, Mode, State},
+};
 use console::style;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::env;
@@ -12,17 +15,18 @@ pub fn verify<'a>(
     exercises: impl IntoIterator<Item = &'a Exercise>,
     progress: (usize, usize),
 ) -> Result<(), &'a Exercise> {
-    let (num_done, total) = progress;
-    let bar = ProgressBar::new(total as u64);
-    bar.set_style(
-        ProgressStyle::default_bar()
-            .template("Progress: [{bar:60.green/red}] {pos}/{len} {msg}\n")
-            .progress_chars("#>-"),
-    );
-    bar.set_position(num_done as u64);
+    let (mut num_done, total) = progress;
     for exercise in exercises {
+        clear_screen();
+        let bar = ProgressBar::new(total as u64);
+        bar.set_style(
+            ProgressStyle::default_bar()
+                .template("Progress: [{bar:60.green/red}] {pos}/{len} {msg}\n")
+                .progress_chars("#>-"),
+        );
+        bar.set_position(num_done as u64);
         let compile_result = match exercise.mode {
-            Mode::Compile => compile_and_run_interactively(exercise),
+            Mode::Build => compile_and_run_interactively(exercise),
             Mode::Test => compile_and_test_interactively(exercise),
         };
         if !compile_result.unwrap_or(false) {
@@ -30,48 +34,35 @@ pub fn verify<'a>(
         }
         let percentage = num_done as f32 / total as f32 * 100.0;
         bar.set_message(format!("({percentage:.1} %)"));
-        bar.inc(1);
+        num_done += 1;
     }
     Ok(())
 }
 
-// Compile the given Exercise and run the resulting binary in an interactive mode
+// Build the given Exercise
 fn compile_and_run_interactively(exercise: &Exercise) -> Result<bool, ()> {
-    let progress_bar = ProgressBar::new_spinner();
+    println!("Building {exercise} exercise...");
 
-    progress_bar.enable_steady_tick(100);
-
-    progress_bar.set_message(format!("Running {exercise} exercise..."));
-
-    let run_state = compile_and_run_cairo(exercise, &progress_bar)?;
-
-    progress_bar.finish_and_clear();
+    let run_state = compile_and_run_cairo(exercise)?;
 
     Ok(prompt_for_completion(exercise, Some(run_state)))
 }
 
-// Tests the given Exercise and run the resulting binary in an interactive mode
+// Tests the given Exercise
 fn compile_and_test_interactively(exercise: &Exercise) -> Result<bool, ()> {
-    let progress_bar = ProgressBar::new_spinner();
-    progress_bar.enable_steady_tick(100);
+    println!("Testing {exercise} exercise...");
 
-    progress_bar.set_message(format!("Testing {exercise} exercise..."));
-
-    let run_state = compile_and_test_cairo(exercise, &progress_bar)?;
-
-    progress_bar.finish_and_clear();
+    let run_state = compile_and_test_cairo(exercise)?;
 
     Ok(prompt_for_completion(exercise, Some(run_state)))
 }
 
-// Compile the given Exercise and return an object with information
+// Build the given Exercise and return an object with information
 // about the state of the compilation
-fn compile_and_run_cairo(exercise: &Exercise, progress_bar: &ProgressBar) -> Result<String, ()> {
-    let compilation_result = exercise.run_cairo();
+fn compile_and_run_cairo(exercise: &Exercise) -> Result<String, ()> {
+    let compilation_result = exercise.build();
 
     if let Err(error) = compilation_result {
-        progress_bar.finish_and_clear();
-
         eprintln!("{error}");
 
         warn!("Compiling of {} failed! Please try again.", exercise);
@@ -83,11 +74,10 @@ fn compile_and_run_cairo(exercise: &Exercise, progress_bar: &ProgressBar) -> Res
 
 // Tests the given Exercise and return an object with information
 // about the state of the tests
-fn compile_and_test_cairo(exercise: &Exercise, progress_bar: &ProgressBar) -> Result<String, ()> {
-    let compilation_result = exercise.test_cairo();
+fn compile_and_test_cairo(exercise: &Exercise) -> Result<String, ()> {
+    let compilation_result = exercise.test();
 
     if let Some(error) = compilation_result.as_ref().err() {
-        progress_bar.finish_and_clear();
         warn!(
             "Testing of {} failed! Please try again. Here's the output:",
             exercise
@@ -106,7 +96,7 @@ fn prompt_for_completion(exercise: &Exercise, prompt_output: Option<String>) -> 
     };
 
     match exercise.mode {
-        Mode::Compile => success!("Successfully ran {}!", exercise),
+        Mode::Build => success!("Successfully built {}!", exercise),
         Mode::Test => success!("Successfully tested {}!", exercise),
         // Mode::Clippy => success!("Successfully compiled {}!", exercise),
     }
@@ -116,7 +106,7 @@ fn prompt_for_completion(exercise: &Exercise, prompt_output: Option<String>) -> 
     let _clippy_success_msg = "The code is compiling, and Clippy is happy!";
 
     let success_msg = match exercise.mode {
-        Mode::Compile => "The code is compiling!",
+        Mode::Build => "The code is compiling!",
         Mode::Test => "The code is compiling, and the tests pass!",
         // Mode::Clippy => clippy_success_msg,
     };
