@@ -4,18 +4,22 @@
 // Step 2: Get the bar_for_fuzz and default_to_baz tests passing!
 // Execute `starklings hint if2` or use the `hint` watch subcommand for a hint.
 
-// I AM NOT DONE
-
 fn foo_if_fizz(fizzish: felt252) -> felt252 {
     // Complete this function using if, else if and/or else blocks.
     // If fizzish is,
     // 'fizz', return 'foo'
     // 'fuzz', return 'bar'
     // anything else, return 'baz'
+    let mut res: felt252 = '';
     if fizzish == 'fizz' {
-        'foo'
+        res = 'foo';
+        res
+    } else if fizzish == 'fuzz' {
+        res = 'bar';
+        res
     } else {
-        1_u32
+        res = 'baz';
+        res
     }
 }
 
